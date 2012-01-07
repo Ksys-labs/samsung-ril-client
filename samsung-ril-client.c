@@ -29,6 +29,7 @@
 #include <sys/un.h>
 #include <sys/select.h>
 
+#include <signal.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <cutils/sockets.h>
@@ -47,6 +48,8 @@ int srs_send_message(HRilClient client, struct srs_message *message)
 	struct srs_header header;
 	void *data;
 
+	int rc;
+
 	header.length = message->data_len + sizeof(header);
 	header.group = SRS_GROUP(message->command);
 	header.index = SRS_INDEX(message->command);
@@ -60,12 +63,14 @@ int srs_send_message(HRilClient client, struct srs_message *message)
 	FD_ZERO(&fds);
 	FD_SET(client_fd, &fds);
 
+	// We can't rely on select RC
 	select(client_fd + 1, NULL, &fds, NULL, NULL);
-	write(client_fd, data, header.length);
+
+	rc = write(client_fd, data, header.length);
 
 	free(data);
 
-	return 0;
+	return rc;
 }
 
 int srs_send(HRilClient client, unsigned short command, void *data, int data_len)
@@ -133,8 +138,17 @@ int srs_ping(HRilClient client)
 
 	struct srs_message message;
 
-	srs_send(client, SRS_CONTROL_PING, &caffe_w, sizeof(caffe_w));
-	srs_recv_timed(client, &message, 0, 300);
+	rc = srs_send(client, SRS_CONTROL_PING, &caffe_w, sizeof(caffe_w));
+
+	if(rc < 0) {
+		return -1;
+	}
+
+	rc = srs_recv_timed(client, &message, 0, 300);
+
+	if(rc < 0) {
+		return -1;
+	}
 
 	if(message.data == NULL) 
 		return -1;
@@ -160,6 +174,8 @@ HRilClient OpenClient_RILD(void)
 
 	LOGE("%s", __func__);
 
+	signal(SIGPIPE, SIG_IGN);
+
 	client = malloc(sizeof(struct RilClient));
 	client->prv = malloc(sizeof(int));
 	client_fd_p = (int *) client->prv;
@@ -177,13 +193,14 @@ int Connect_RILD(HRilClient client)
 
 	LOGE("%s", __func__);
 
+socket_connect:
 	while(t < 5) {
 		fd = socket_local_client(SRS_SOCKET_NAME, ANDROID_SOCKET_NAMESPACE_RESERVED, SOCK_STREAM);
 
 		if(fd > 0)
 			break;
 
-		LOGE("Socket creation to RIL failed: trying another time in a sec");
+		LOGE("Socket creation to RIL failed: trying another time");
 
 		t++;
 		usleep(300);
@@ -202,6 +219,7 @@ int Connect_RILD(HRilClient client)
 
 	if(rc < 0) {
 		LOGE("Ping failed!");
+		goto socket_connect;
 	} else {
 		LOGD("Ping went alright");
 	}
@@ -214,8 +232,6 @@ int Disconnect_RILD(HRilClient client)
 	int client_fd = *((int *) client->prv);
 
 	LOGE("%s", __func__);
-
-	//FIXME: send a message telling we are leaving!
 
 	close(client_fd);
 
@@ -239,6 +255,7 @@ int CloseClient_RILD(HRilClient client)
 int isConnected_RILD(HRilClient client)
 {
 	int client_fd = *((int *) client->prv);
+	int rc;
 
 	LOGE("%s", __func__);
 
@@ -246,14 +263,25 @@ int isConnected_RILD(HRilClient client)
 		return 0;
 	}
 
+	rc = srs_ping(client);
+
+	if(rc < 0) {
+		LOGE("Ping failed!");
+		close(client_fd);
+
+		return 0;
+	} else {
+		LOGD("Ping went alright");
+	}
+
 	return 1;
 }
 
 int SetCallVolume(HRilClient client, SoundType type, int vol_level)
 {
-	LOGE("Asking call volume");
-
 	struct srs_snd_call_volume call_volume;
+
+	LOGD("Asking call volume");
 
 	call_volume.type = (enum srs_snd_type) type;
 	call_volume.volume = vol_level;	
@@ -266,17 +294,18 @@ int SetCallVolume(HRilClient client, SoundType type, int vol_level)
 
 int SetCallAudioPath(HRilClient client, AudioPath path)
 {
-	LOGE("Asking audio path!");
-
 	srs_send(client, SRS_SND_SET_CALL_AUDIO_PATH, (void *) &path, sizeof(enum srs_snd_path));
+
+	LOGD("Asking audio path");
 
 	return RIL_CLIENT_ERR_SUCCESS;
 }
 
 int SetCallClockSync(HRilClient client, SoundClockCondition condition)
 {
-	LOGE("Asking clock sync!");
 	unsigned char data = condition;
+
+	LOGD("Asking clock sync");
 
 	srs_send(client, SRS_SND_SET_CALL_CLOCK_SYNC, &data, sizeof(data));
 
