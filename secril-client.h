@@ -26,7 +26,9 @@ extern "C" {
 #endif
 
 struct RilClient {
-    void *prv;
+    void *lib_handle;
+	void *client;
+	int volume_steps_max;
 };
 
 typedef struct RilClient * HRilClient;
@@ -64,31 +66,31 @@ typedef int (*RilOnError)(void *data, int error);
  * Open RILD multi-client.
  * Return is client handle, NULL on error.
  */
-HRilClient OpenClient_RILD(void);
+int OpenClient_RILD(void);
 
 /**
  * Stop RILD multi-client. If client socket was connected,
  * it will be disconnected.
  */
-int CloseClient_RILD(HRilClient client);
+int CloseClient_RILD(int *p_client_fd);
 
 /**
  * Connect to RIL deamon. One client task starts.
  * Return is 0 or error code.
  */
-int Connect_RILD(HRilClient client);
+int Connect_RILD(int *p_client_fd);
 
 /**
  * check whether RILD is connected
  * Returns 0 or 1
  */
-int isConnected_RILD(HRilClient client);
+int isConnected_RILD(int *p_client_fd);
 
 /**
  * Disconnect connection to RIL deamon(socket close).
  * Return is 0 or error code.
  */
-int Disconnect_RILD(HRilClient client);
+int Disconnect_RILD(int *p_client_fd);
 
 /**
  * Register unsolicited response handler. If handler is NULL,
@@ -96,7 +98,7 @@ int Disconnect_RILD(HRilClient client);
  * The response handler is invoked in the client task context.
  * Return is 0 or error code.
  */
-int RegisterUnsolicitedHandler(HRilClient client, uint32_t id, RilOnUnsolicited handler);
+int RegisterUnsolicitedHandler(int *p_client_fd, uint32_t id, RilOnUnsolicited handler);
 
 /**
  * Register solicited response handler. If handler is NULL,
@@ -104,7 +106,7 @@ int RegisterUnsolicitedHandler(HRilClient client, uint32_t id, RilOnUnsolicited 
  * The response handler is invoked in the client task context.
  * Return is 0 or error code.
  */
-int RegisterRequestCompleteHandler(HRilClient client, uint32_t id, RilOnComplete handler);
+int RegisterRequestCompleteHandler(int *p_client_fd, uint32_t id, RilOnComplete handler);
 
 /**
  * Register error callback. If handler is NULL,
@@ -112,13 +114,13 @@ int RegisterRequestCompleteHandler(HRilClient client, uint32_t id, RilOnComplete
  * The response handler is invoked in the client task context.
  * Return is 0 or error code.
  */
-int RegisterErrorCallback(HRilClient client, RilOnError cb, void *data);
+int RegisterErrorCallback(int *p_client_fd, RilOnError cb, void *data);
 
 /**
  * Invoke OEM request. Request ID is RIL_REQUEST_OEM_HOOK_RAW.
  * Return is 0 or error code. For RIL_CLIENT_ERR_AGAIN caller should retry.
  */
-int InvokeOemRequestHookRaw(HRilClient client, char *data, size_t len);
+int InvokeOemRequestHookRaw(int *p_client_fd, char *data, size_t len);
 
 /**
  * Sound device types.
@@ -153,17 +155,17 @@ typedef enum _SoundClockCondition {
 /**
  * Set in-call volume.
  */
-int SetCallVolume(HRilClient client, SoundType type, int vol_level);
+int SetCallVolume(int *p_client_fd, SoundType type, int vol_level);
 
 /**
  * Set external sound device path for noise reduction.
  */
-int SetCallAudioPath(HRilClient client, AudioPath path);
+int SetCallAudioPath(int *p_client_fd, AudioPath path);
 
 /**
  * Set modem clock to master or slave.
  */
-int SetCallClockSync(HRilClient client, SoundClockCondition condition);
+int SetCallClockSync(int *p_client_fd, SoundClockCondition condition);
 
 #ifdef __cplusplus
 };

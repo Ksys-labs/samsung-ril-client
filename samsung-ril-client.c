@@ -40,9 +40,9 @@
 #include <secril-client.h>
 #include <samsung-ril-socket.h>
 
-int srs_send_message(HRilClient client, struct srs_message *message)
+int srs_send_message(int *p_client_fd, struct srs_message *message)
 {
-	int client_fd = *((int *) client->prv);
+	int client_fd = *p_client_fd;
 	fd_set fds;
 
 	struct srs_header header;
@@ -73,7 +73,7 @@ int srs_send_message(HRilClient client, struct srs_message *message)
 	return rc;
 }
 
-int srs_send(HRilClient client, unsigned short command, void *data, int data_len)
+int srs_send(int *p_client_fd, unsigned short command, void *data, int data_len)
 {
 	struct srs_message message;
 	int rc;
@@ -84,18 +84,18 @@ int srs_send(HRilClient client, unsigned short command, void *data, int data_len
 	message.data = data;
 	message.data_len = data_len;
 
-	rc = srs_send_message(client, &message);
+	rc = srs_send_message(p_client_fd, &message);
 
 	return rc;
 }
 
-int srs_recv_timed(HRilClient client, struct srs_message *message, long sec, long usec)
+int srs_recv_timed(int *p_client_fd, struct srs_message *message, long sec, long usec)
 {
 	void *raw_data = malloc(SRS_DATA_MAX_SIZE);
 	struct srs_header *header;
 	int rc;
 
-	int client_fd = *((int *) client->prv);
+	int client_fd = *p_client_fd;
 	struct timeval timeout;
 	fd_set fds;
 
@@ -125,12 +125,12 @@ int srs_recv_timed(HRilClient client, struct srs_message *message, long sec, lon
 	return 0;
 }
 
-int srs_recv(HRilClient client, struct srs_message *message)
+int srs_recv(int *p_client_fd, struct srs_message *message)
 {
-	return srs_recv_timed(client, message, 0, 0);
+	return srs_recv_timed(p_client_fd, message, 0, 0);
 }
 
-int srs_ping(HRilClient client)
+int srs_ping(int *p_client_fd)
 {
 	int caffe_w = SRS_CONTROL_CAFFE;
 	int caffe_r = 0;	
@@ -138,13 +138,13 @@ int srs_ping(HRilClient client)
 
 	struct srs_message message;
 
-	rc = srs_send(client, SRS_CONTROL_PING, &caffe_w, sizeof(caffe_w));
+	rc = srs_send(p_client_fd, SRS_CONTROL_PING, &caffe_w, sizeof(caffe_w));
 
 	if(rc < 0) {
 		return -1;
 	}
 
-	rc = srs_recv_timed(client, &message, 0, 300);
+	rc = srs_recv_timed(p_client_fd, &message, 0, 300);
 
 	if(rc < 0) {
 		return -1;
@@ -167,37 +167,40 @@ int srs_ping(HRilClient client)
 	return rc;
 }
 
-HRilClient OpenClient_RILD(void)
+int OpenClient_RILD(void)
 {
-	HRilClient client;
 	int *client_fd_p = NULL;
 
 	LOGE("%s", __func__);
 
 	signal(SIGPIPE, SIG_IGN);
 
-	client = malloc(sizeof(struct RilClient));
-	client->prv = malloc(sizeof(int));
-	client_fd_p = (int *) client->prv;
+	client_fd_p = malloc(sizeof(int));
+	if (!client_fd_p) {
+		LOGE("%s: failed to allocate memory for the client fd", __func__);
+		return 0;
+	}
+	LOGE("%s: client fd pointer %x", __func__, client_fd_p);
 	*client_fd_p = -1;
 
-	return client;
+	return client_fd_p;
 }
 
-int Connect_RILD(HRilClient client)
+int Connect_RILD(int *pfd)
 {
 	int t = 0;
 	int fd = -1;
 	int rc;
-	int *client_fd_p = (int *) client->prv;
+	int *client_fd_p = pfd;
 
 	LOGE("%s", __func__);
 
 socket_connect:
 	while(t < 5) {
 		fd = socket_local_client(SRS_SOCKET_NAME, ANDROID_SOCKET_NAMESPACE_RESERVED, SOCK_STREAM);
+		LOGE("%s: fd %d, errno %d, err %s", __func__, fd, errno, strerror(errno));
 
-		if(fd > 0)
+		if(fd >= 0)
 			break;
 
 		LOGE("Socket creation to RIL failed: trying another time");
@@ -215,7 +218,7 @@ socket_connect:
 
 	LOGE("Socket creation done, sending ping");
 
-	rc = srs_ping(client);
+	rc = srs_ping(pfd);
 
 	if(rc < 0) {
 		LOGE("Ping failed!");
@@ -227,9 +230,9 @@ socket_connect:
 	return RIL_CLIENT_ERR_SUCCESS;
 }
 
-int Disconnect_RILD(HRilClient client)
+int Disconnect_RILD(int *p_client_fd)
 {
-	int client_fd = *((int *) client->prv);
+	int client_fd = *p_client_fd;
 
 	LOGE("%s", __func__);
 
@@ -238,32 +241,28 @@ int Disconnect_RILD(HRilClient client)
 	return RIL_CLIENT_ERR_SUCCESS;
 }
 
-int CloseClient_RILD(HRilClient client)
+int CloseClient_RILD(int *pfd)
 {
-	int *client_fd_p = (int *) client->prv;
-
 	LOGE("%s", __func__);
-
-	if(client_fd_p != NULL)
-		free(client_fd_p);
-
-	free(client);
+	free(pfd);
 
 	return RIL_CLIENT_ERR_SUCCESS;
 }
 
-int isConnected_RILD(HRilClient client)
+int isConnected_RILD(int *pfd)
 {
-	int client_fd = *((int *) client->prv);
+	int client_fd;
 	int rc;
 
 	LOGE("%s", __func__);
+	LOGE("%s: pfd %x", __func__, pfd);
 
+	client_fd = *pfd;
 	if(client_fd < 0) {
 		return 0;
 	}
 
-	rc = srs_ping(client);
+	rc = srs_ping(pfd);
 
 	if(rc < 0) {
 		LOGE("Ping failed!");
@@ -277,7 +276,7 @@ int isConnected_RILD(HRilClient client)
 	return 1;
 }
 
-int SetCallVolume(HRilClient client, SoundType type, int vol_level)
+int SetCallVolume(int *pfd, SoundType type, int vol_level)
 {
 	struct srs_snd_call_volume call_volume;
 
@@ -286,28 +285,34 @@ int SetCallVolume(HRilClient client, SoundType type, int vol_level)
 	call_volume.type = (enum srs_snd_type) type;
 	call_volume.volume = vol_level;	
 
-	srs_send(client, SRS_SND_SET_CALL_VOLUME, (void *) &call_volume, sizeof(call_volume));
+	srs_send(pfd, SRS_SND_SET_CALL_VOLUME, (void *) &call_volume, sizeof(call_volume));
 
 	return RIL_CLIENT_ERR_SUCCESS;
 }
 
 
-int SetCallAudioPath(HRilClient client, AudioPath path)
+int SetCallAudioPath(int *pfd, AudioPath path)
 {
-	srs_send(client, SRS_SND_SET_CALL_AUDIO_PATH, (void *) &path, sizeof(enum srs_snd_path));
+	srs_send(pfd, SRS_SND_SET_CALL_AUDIO_PATH, (void *) &path, sizeof(enum srs_snd_path));
 
 	LOGD("Asking audio path");
 
 	return RIL_CLIENT_ERR_SUCCESS;
 }
 
-int SetCallClockSync(HRilClient client, SoundClockCondition condition)
+int SetCallClockSync(int *pfd, SoundClockCondition condition)
 {
 	unsigned char data = condition;
 
 	LOGD("Asking clock sync");
 
-	srs_send(client, SRS_SND_SET_CALL_CLOCK_SYNC, &data, sizeof(data));
+	srs_send(pfd, SRS_SND_SET_CALL_CLOCK_SYNC, &data, sizeof(data));
 
 	return RIL_CLIENT_ERR_SUCCESS;
+}
+
+int RegisterUnsolicitedHandler(int *p_client_fd, uint32_t id, RilOnUnsolicited handler)
+{
+	//do nothing for now
+	return 0;
 }
