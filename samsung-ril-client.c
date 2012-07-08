@@ -311,7 +311,28 @@ int SetCallClockSync(int *pfd, SoundClockCondition condition)
 	return RIL_CLIENT_ERR_SUCCESS;
 }
 
-int RegisterUnsolicitedHandler(int *p_client_fd, uint32_t id, RilOnUnsolicited handler)
+//the functions below are defined to make the proprietary GPS and NFC
+//libraries happy and we'll keep them until these libs are reimplemented
+int RegisterUnsolicitedHandler(int *p_client_fd, uint32_t id,
+	RilOnUnsolicited handler)
+{
+	//do nothing for now
+	return 0;
+}
+
+int RegisterRequestCompleteHandler(int *p_client_fd, uint32_t id,
+	RilOnComplete handler) {
+	//do nothing for now
+	return 0;
+}
+
+int RegisterErrorCallback(int *p_client_fd, RilOnError cb, void *data)
+{
+	//do nothing for now
+	return 0;
+}
+
+int InvokeOemRequestHookRaw(int *p_client_fd, char *data, size_t len)
 {
 	//do nothing for now
 	return 0;

@@ -2,7 +2,10 @@ LOCAL_PATH:= $(call my-dir)
 
 include $(CLEAR_VARS)
 
-LOCAL_MODULE := libsamsung-ril-client
+#this name is required by some blobs
+#I do not advocate the use of closed source software
+#but let's not deliberately break compatibility
+LOCAL_MODULE := libsecril-client
 LOCAL_MODULE_TAGS := optional
 
 LOCAL_SRC_FILES := samsung-ril-client.c
