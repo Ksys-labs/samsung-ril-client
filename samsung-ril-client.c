@@ -197,7 +197,7 @@ int Connect_RILD(int *pfd)
 
 socket_connect:
 	while(t < 5) {
-		fd = socket_local_client(SRS_SOCKET_NAME, ANDROID_SOCKET_NAMESPACE_RESERVED, SOCK_STREAM);
+		fd = socket_local_client(SRS_SOCKET_NAME, ANDROID_SOCKET_NAMESPACE_ABSTRACT, SOCK_STREAM);
 		LOGE("%s: fd %d, errno %d, err %s", __func__, fd, errno, strerror(errno));
 
 		if(fd >= 0)
