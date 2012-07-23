@@ -322,21 +322,21 @@ int RegisterUnsolicitedHandler(int *p_client_fd, uint32_t id,
 
 int RegisterRequestCompleteHandler(int *p_client_fd, uint32_t id,
 	RilOnComplete handler) {
-	LOGE("%s: %x %x %x", __func__, p_client_fd, id, handler);
+	ALOGE("%s: %x %x %x", __func__, p_client_fd, id, handler);
 	//do nothing for now
 	return 0;
 }
 
 int RegisterErrorCallback(int *p_client_fd, RilOnError cb, void *data)
 {
-	LOGE("%s: %x %x %x", __func__, p_client_fd, cb, data);
+	ALOGE("%s: %x %x %x", __func__, p_client_fd, cb, data);
 	//do nothing for now
 	return 0;
 }
 
 int InvokeOemRequestHookRaw(int *p_client_fd, char *data, size_t len)
 {
-	LOGE("%s: %x %x %x", __func__, p_client_fd, data, len);
+	ALOGE("%s: %x %x %x", __func__, p_client_fd, data, len);
 	//do nothing for now
 	return 0;
 }
