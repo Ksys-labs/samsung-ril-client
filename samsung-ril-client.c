@@ -2,6 +2,7 @@
  * Samsung RIL Client (Samsung RIL Socket Client-side implementation)
  *
  * Copyright (C) 2011 Paul Kocialkowski <contact@paulk.fr>
+ * Copyright (C) 2012 Alexander Tarasikov <alexander.tarasikov@gmail.com>
  *
  * samsung-ril-client is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -39,6 +40,15 @@
 
 #include <secril-client.h>
 #include <samsung-ril-socket.h>
+
+/* for compatibility with both pre- and post- JellyBean */
+#ifndef ALOGE
+	#define ALOGE LOGE
+#endif
+
+#ifndef ALOGD
+	#define ALOGD LOGD
+#endif
 
 int srs_send_message(int *p_client_fd, struct srs_message *message)
 {
